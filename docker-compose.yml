@@ -1,0 +1,9 @@
+name: xelemetry
+
+services:
+  api:
+    build: .
+    ports:
+      - "${PORT}:${PORT}"
+    environment:
+      - PORT=${PORT}
