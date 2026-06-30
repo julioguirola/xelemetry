@@ -21,11 +21,19 @@ func main() {
 		panic("PORT environment variable is not set")
 	}
 
-	err = db.Migrator().DropTable(&internal.Check{})
+	err = db.Migrator().DropTable(
+		&internal.Check{},
+		&internal.Uptime{},
+		&internal.Location{},
+	)
 	if err != nil {
 		panic(err)
 	}
-	err = db.AutoMigrate(&internal.Check{})
+	err = db.AutoMigrate(
+		&internal.Check{},
+		&internal.Uptime{},
+		&internal.Location{},
+	)
 	if err != nil {
 		panic(err)
 	}

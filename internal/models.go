@@ -1,8 +1,27 @@
 package internal
 
-import "time"
+import (
+	"time"
+)
 
 type Check struct {
-	ID   int
-	Time *time.Time `gorm:"default:current_timestamp"`
+	ID         int
+	Time       *time.Time `gorm:"default:current_timestamp"`
+	LocationID string
+	Location   Location
+}
+
+type Uptime struct {
+	ID         int
+	Duration   int
+	StartTime  time.Time `gorm:"default:current_timestamp"`
+	LocationID string
+	Location   Location
+}
+
+type Location struct {
+	ID     string
+	Nombre string `gorm:"unique"`
+	Checks []Check
+	Uptime []Uptime
 }
