@@ -1,11 +1,14 @@
 package main
 
 import (
+	"log"
 	"os"
+	"time"
 	"xelemetry/internal"
 
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 type GetCheckQuery struct {
@@ -13,7 +16,21 @@ type GetCheckQuery struct {
 }
 
 func main() {
-	db, err := gorm.Open(sqlite.Open("checks.db"), &gorm.Config{})
+	newLogger := logger.New(
+		log.New(os.Stdout, "\r\n", log.LstdFlags),
+		logger.Config{
+			SlowThreshold:             time.Second,
+			LogLevel:                  logger.Info,
+			IgnoreRecordNotFoundError: true,
+			ParameterizedQueries:      true,
+			Colorful:                  false,
+		},
+	)
+
+	// Globally mode
+	db, err := gorm.Open(sqlite.Open("checks.db"), &gorm.Config{
+		Logger: newLogger,
+	})
 	if err != nil {
 		panic(err)
 	}
@@ -22,9 +39,9 @@ func main() {
 	}
 
 	err = db.Migrator().DropTable(
+		&internal.Location{},
 		&internal.Check{},
 		&internal.Uptime{},
-		&internal.Location{},
 	)
 	if err != nil {
 		panic(err)

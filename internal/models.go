@@ -8,7 +8,6 @@ type Check struct {
 	ID         int
 	Time       *time.Time `gorm:"default:current_timestamp"`
 	LocationID string
-	Location   Location
 }
 
 type Uptime struct {
@@ -16,12 +15,11 @@ type Uptime struct {
 	Duration   int
 	StartTime  time.Time `gorm:"default:current_timestamp"`
 	LocationID string
-	Location   Location
 }
 
 type Location struct {
-	ID     string
-	Nombre string `gorm:"unique"`
-	Checks []Check
-	Uptime []Uptime
+	ID      string
+	Nombre  string `gorm:"unique"`
+	Checks  []Check
+	Uptimes []Uptime
 }
