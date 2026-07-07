@@ -144,7 +144,7 @@ Obtiene la lista de registros de uptime (tiempo que una ubicación estuvo conect
 
 ### GET /ws
 
-Endpoint WebSocket para rastrear el uptime de una ubicación. Mantiene la conexión abierta mientras hay corriente y registra la duración al desconectarse.
+Endpoint WebSocket para rastrear el uptime de una ubicación. Al conectarse crea un registro `uptime` (con `duration` nulo) y al desconectarse actualiza ese mismo registro con la duración real.
 
 - **Método**: `GET`
 - **URL**: `/ws`
@@ -154,8 +154,9 @@ Endpoint WebSocket para rastrear el uptime de una ubicación. Mantiene la conexi
   | `location_id` | string (UUID) | Sí | ID de la ubicación a monitorear |
 - **Comportamiento**:
   1. Conectar al WebSocket con `location_id`
-  2. Mantener la conexión abierta
-  3. Al desconectarse, se calcula automáticamente la duración y se guarda en la base de datos
+  2. Se crea un registro `uptime` con `duration = null`
+  3. Mantener la conexión abierta
+  4. Al desconectarse, se actualiza ese registro con la duración real
 - **Respuesta exitosa**:
   - Conexión WebSocket establecida
   - No retorna respuesta HTTP tradicional
@@ -186,7 +187,7 @@ La aplicación utiliza **SQLite** como base de datos, gestionada a través de **
 | Campo | Tipo | Descripción |
 |-------|------|-------------|
 | `id` | INTEGER | Clave primaria, autoincremental |
-| `duration` | INTEGER | Duración en segundos |
+| `duration` | INTEGER | Duración en segundos (nulo mientras la conexión está activa) |
 | `start_time` | DATETIME | Hora de inicio. Default: `current_timestamp` |
 | `location_id` | TEXT (UUID) | FK hacia locations |
 

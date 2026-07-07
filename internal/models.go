@@ -12,7 +12,7 @@ type Check struct {
 
 type Uptime struct {
 	ID         int
-	Duration   int
+	Duration   *int
 	StartTime  time.Time `gorm:"default:current_timestamp"`
 	LocationID string
 }

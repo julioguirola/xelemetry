@@ -106,16 +106,20 @@ func main() {
 		}
 
 		startTime := time.Now()
+		uptimeRecord := internal.Uptime{
+			LocationID: locationID,
+		}
+		if err := gorm.G[internal.Uptime](db).Create(c.Request().Context(), &uptimeRecord); err != nil {
+			c.Logger().Error(fmt.Sprintf("failed to create uptime for %s: %v", locationID, err))
+			return err
+		}
+
 		c.Logger().Info(fmt.Sprintf("Location %s conectada.", locationID))
 
 		defer func() {
 			duration := int(time.Since(startTime).Seconds())
-			uptimeRecord := internal.Uptime{
-				LocationID: locationID,
-				Duration:   duration,
-			}
-			if err := gorm.G[internal.Uptime](db).Create(c.Request().Context(), &uptimeRecord); err != nil {
-				c.Logger().Error(fmt.Sprintf("failed to save uptime for %s: %v", locationID, err))
+			if _, err := gorm.G[internal.Uptime](db).Where("id = ?", uptimeRecord.ID).Update(c.Request().Context(), "duration", duration); err != nil {
+				c.Logger().Error(fmt.Sprintf("failed to update uptime for %s: %v", locationID, err))
 			}
 			err = ws.Close()
 			if err != nil {
