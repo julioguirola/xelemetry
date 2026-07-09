@@ -19,6 +19,7 @@ Go API for tracking office power availability (electrical outages in Cuba). Clie
 |--------|------|---------|
 | API server | `cmd/api/main.go` | HTTP + WebSocket server |
 | Migration | `cmd/migration/main.go` | Drops tables + AutoMigrate (destructive) |
+| Daemon | `cmd/daemon/main.go` | WS client — keeps connection alive, reconnects every 10s on failure |
 
 Models (`Location`, `User`, `Uptime`) are in `internal/models.go`. Note: `User` has a has-many relationship to `Location`; `Location` has a has-many to `Uptime`.
 
@@ -30,10 +31,14 @@ go run cmd/migration/main.go
 
 # 2. Start API
 go run cmd/api/main.go
+
+# 3. Daemon (separate terminal, replace <location_id>)
+go run cmd/daemon/main.go <location_id>
 ```
 
 `PORT` env var is required. Default: `1323` (from `.env`).
 `JWT_SECRET` env var is required (no default — server panics if unset).
+`API_URL` is used by the daemon to reach the server. Default: `http://localhost:1323`.
 
 ## Docker deploy
 

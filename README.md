@@ -178,6 +178,32 @@ Endpoint WebSocket para rastrear el uptime de una ubicación en tiempo real. No 
 
 ---
 
+## Daemon (cliente WebSocket)
+
+El binario `daemon` establece y mantiene una conexión WebSocket contra el servidor remoto para detectar con precisión cuándo hay corriente. Se ejecuta en la máquina local (oficina) y se conecta al `GET /ws` del API.
+
+### Comportamiento
+
+1. Se conecta al WebSocket con el `location_id` recibido
+2. Mantiene la conexión abierta mientras haya corriente
+3. Si la conexión se cae (problemas de red, servidor remoto caído), **reintenta cada 10s indefinidamente**
+4. Solo termina al recibir `SIGINT`/`SIGTERM` (cuando se apaga el servidor local porque se fue la corriente)
+
+### Modo de uso
+
+```sh
+go run cmd/daemon/main.go <location_id>
+
+# Con URL personalizada:
+API_URL=http://localhost:8080 go run cmd/daemon/main.go <location_id>
+```
+
+### Cómo se integra
+
+El daemon debe iniciarse automáticamente cuando arranca el servidor local (corriente disponible) y se detiene cuando el servidor se apaga (corte eléctrico). Mientras el servidor local esté encendido, el daemon mantiene o reconecta el WebSocket contra el API remoto sin intervención manual.
+
+---
+
 ## Estructura de la Base de Datos
 
 La aplicación utiliza **SQLite** como base de datos, gestionada a través de **GORM**.
@@ -222,6 +248,7 @@ La aplicación utiliza **SQLite** como base de datos, gestionada a través de **
 |----------|-------------|---------|
 | `PORT` | Puerto en el que correrá la aplicación | `8080` |
 | `JWT_SECRET` | Secreto para firmar tokens JWT | `mi-secreto-super-seguro` |
+| `API_URL` | URL del servidor remoto (solo para el daemon) | `http://localhost:1323` |
 
 > ⚠️ `JWT_SECRET` es obligatorio. Si no se configura, la API falla al iniciar.
 
