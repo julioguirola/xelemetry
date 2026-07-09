@@ -4,16 +4,88 @@
 
 Xelemetry es una API que registra requests para saber cuándo hay corriente en la oficina. Cuando llega la corriente, se enciende un servidor local que comienza a hacer requests en forma de polling a esta API para registrar los horarios de corriente, debido a la situación actual de Cuba con los apagones eléctricos. Esto contribuirá a gestionar de mejor manera el tiempo del personal.
 
-## Endpoints del API
+## Autenticación
+
+Todos los endpoints marcados con **🔒 Requiere token** deben incluir el header:
+
+```
+Authorization: Bearer <token>
+```
+
+El token se obtiene mediante `POST /login`.
 
 ---
 
-### POST /location
+## Endpoints públicos (no requieren autenticación)
 
-Crea una nueva ubicación/locación.
+### POST /user
+
+Crea un nuevo usuario.
+
+- **Método**: `POST`
+- **URL**: `/user`
+- **Body** (JSON):
+  ```json
+  {
+    "user_name": "juan",
+    "pass_word": "miPassword123"
+  }
+  ```
+- **Parámetros**:
+  | Campo | Tipo | Requerido | Descripción |
+  |-------|------|----------|-------------|
+  | `user_name` | string | Sí | Nombre de usuario |
+  | `pass_word` | string | Sí | Contraseña (se hashea con argon2) |
+- **Respuesta exitosa**: `201 Created`
+  ```json
+  {
+    "ID": "uuid-string",
+    "UserName": "juan",
+    "PassWord": "$argon2id$v=19$m=...",
+    "Locations": null
+  }
+  ```
+
+---
+
+### POST /login
+
+Inicia sesión y devuelve un token JWT.
+
+- **Método**: `POST`
+- **URL**: `/login`
+- **Body** (JSON):
+  ```json
+  {
+    "user_name": "juan",
+    "pass_word": "miPassword123"
+  }
+  ```
+- **Parámetros**:
+  | Campo | Tipo | Requerido | Descripción |
+  |-------|------|----------|-------------|
+  | `user_name` | string | Sí | Nombre de usuario |
+  | `pass_word` | string | Sí | Contraseña |
+- **Respuesta exitosa**: `200 OK`
+  ```json
+  {
+    "token": "eyJhbGciOiJIUzI1NiIs..."
+  }
+  ```
+- **Errores**:
+  - `401 Unauthorized`: credenciales inválidas
+
+---
+
+## Endpoints protegidos (requieren token 🔒)
+
+### POST /location 🔒
+
+Crea una nueva ubicación asociada al usuario autenticado.
 
 - **Método**: `POST`
 - **URL**: `/location`
+- **Header**: `Authorization: Bearer <token>`
 - **Body** (JSON):
   ```json
   {
@@ -24,70 +96,72 @@ Crea una nueva ubicación/locación.
   | Campo | Tipo | Requerido | Descripción |
   |-------|------|----------|-------------|
   | `nombre` | string | Sí | Nombre de la ubicación |
-- **Respuesta exitosa**:
-  - **Código**: `201 Created`
-  - **Body**:
-    ```json
-    {
-      "ID": "uuid-string",
-      "Nombre": "Oficina Central"
-    }
-    ```
+- **Respuesta exitosa**: `201 Created`
+  ```json
+  {
+    "ID": "uuid-string",
+    "Nombre": "Oficina Central",
+    "UserID": "uuid-string",
+    "Uptimes": null
+  }
+  ```
 
 ---
 
-### GET /location
+### GET /location 🔒
 
-Lista todas las ubicaciones.
+Lista las ubicaciones del usuario autenticado.
 
 - **Método**: `GET`
 - **URL**: `/location`
-- **Respuesta exitosa**:
-  - **Código**: `200 OK`
-  - **Body**:
-    ```json
-    [
-      {
-        "ID": "uuid-string",
-        "Nombre": "Oficina Central"
-      }
-    ]
-    ```
+- **Header**: `Authorization: Bearer <token>`
+- **Respuesta exitosa**: `200 OK`
+  ```json
+  [
+    {
+      "ID": "uuid-string",
+      "Nombre": "Oficina Central",
+      "UserID": "uuid-string",
+      "Uptimes": null
+    }
+  ]
+  ```
 
 ---
 
-### GET /uptime
+### GET /uptime 🔒
 
-Obtiene la lista de registros de uptime (tiempo que una ubicación estuvo conectada).
+Obtiene los uptimes de una ubicación específica. Solo accesible si la ubicación pertenece al usuario autenticado.
 
 - **Método**: `GET`
 - **URL**: `/uptime`
+- **Header**: `Authorization: Bearer <token>`
 - **Query Parameters**:
   | Parámetro | Tipo | Requerido | Descripción |
   |-----------|------|----------|-------------|
-  | `limit` | int | No | Cantidad máxima de registros. Default: `40`. Rango: `1` a `100` |
-  | `from` | string | No | Fecha/hora de inicio para filtrar (formato SQLite) |
-  | `to` | string | No | Fecha/hora de fin para filtrar (formato SQLite) |
-  | `location_id` | string (UUID) | No | Filtrar por ubicación |
-- **Respuesta exitosa**:
-  - **Código**: `200 OK`
-  - **Body**:
-    ```json
-    [
-      {
-        "ID": 1,
-        "Duration": 3600,
-        "StartTime": "2024-01-01T12:00:00Z",
-        "LocationID": "uuid-string"
-      }
-    ]
-    ```
+  | `location_id` | string (UUID) | **Sí** | ID de la ubicación |
+  | `limit` | int | No | Cantidad máxima. Default: `40`. Rango: `1`–`100` |
+  | `from` | string | No | Filtro desde (formato ISO/SQLite) |
+  | `to` | string | No | Filtro hasta (formato ISO/SQLite) |
+- **Respuesta exitosa**: `200 OK`
+  ```json
+  [
+    {
+      "ID": 1,
+      "Duration": 3600,
+      "StartTime": "2024-01-01T12:00:00Z",
+      "LocationID": "uuid-string"
+    }
+  ]
+  ```
+- **Errores**:
+  - `404 Not Found`: la ubicación no existe o no pertenece al usuario
 
 ---
 
 ### GET /ws
 
-Endpoint WebSocket para rastrear el uptime de una ubicación. Al conectarse crea un registro `uptime` (con `duration` nulo) y al desconectarse actualiza ese mismo registro con la duración real.
+Endpoint WebSocket para rastrear el uptime de una ubicación en tiempo real. No requiere autenticación.
 
 - **Método**: `GET`
 - **URL**: `/ws`
@@ -96,13 +170,11 @@ Endpoint WebSocket para rastrear el uptime de una ubicación. Al conectarse crea
   |-----------|------|----------|-------------|
   | `location_id` | string (UUID) | Sí | ID de la ubicación a monitorear |
 - **Comportamiento**:
-  1. Conectar al WebSocket con `location_id`
+  1. Se conecta al WebSocket con `location_id`
   2. Se crea un registro `uptime` con `duration = null`
-  3. Mantener la conexión abierta
-  4. Al desconectarse, se actualiza ese registro con la duración real
-- **Respuesta exitosa**:
-  - Conexión WebSocket establecida
-  - No retorna respuesta HTTP tradicional
+  3. Se mantiene la conexión abierta mientras hay corriente
+  4. Al desconectarse, se actualiza ese registro con la duración real en segundos
+- **Respuesta**: Conexión WebSocket establecida (no retorna HTTP)
 
 ---
 
@@ -149,6 +221,9 @@ La aplicación utiliza **SQLite** como base de datos, gestionada a través de **
 | Variable | Descripción | Ejemplo |
 |----------|-------------|---------|
 | `PORT` | Puerto en el que correrá la aplicación | `8080` |
+| `JWT_SECRET` | Secreto para firmar tokens JWT | `mi-secreto-super-seguro` |
+
+> ⚠️ `JWT_SECRET` es obligatorio. Si no se configura, la API falla al iniciar.
 
 ### Pasos para el Despliegue
 

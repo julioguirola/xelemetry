@@ -33,6 +33,7 @@ go run cmd/api/main.go
 ```
 
 `PORT` env var is required. Default: `1323` (from `.env`).
+`JWT_SECRET` env var is required (no default — server panics if unset).
 
 ## Docker deploy
 
@@ -47,6 +48,8 @@ docker compose exec api ./migration
 
 - SQLite DB file: `checks.db` (gitignored)
 - Migration calls `DropTable` then `AutoMigrate` — **always destructive**
-- `GET /uptime` default `limit=40`, range 1–100; filter via `from`, `to`, `location_id`
 - `GET /ws` creates an `Uptime` record on connect (duration = null) and updates it with the elapsed seconds on disconnect; reads messages but ignores content
+- Endpoints **requiring JWT** (via `Authorization: Bearer <token>`): `POST /location`, `GET /location`, `GET /uptime`
+- `GET /uptime` requires `location_id` query param and verifies ownership (location must belong to the authenticated user); default `limit=40`, range 1–100
+- CORS configured to allow all origins, methods, and headers
 - No tests, no CI, no formatter/linter config, no Makefile
