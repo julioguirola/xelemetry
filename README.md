@@ -56,63 +56,6 @@ Lista todas las ubicaciones.
 
 ---
 
-### POST /check
-
-Registra un nuevo check (momento en que hay corriente).
-
-- **Método**: `POST`
-- **URL**: `/check`
-- **Body** (JSON):
-  ```json
-  {
-    "location_id": "uuid-string"
-  }
-  ```
-- **Parámetros**:
-  | Campo | Tipo | Requerido | Descripción |
-  |-------|------|----------|-------------|
-  | `location_id` | string (UUID) | Sí | ID de la ubicación |
-- **Respuesta exitosa**:
-  - **Código**: `201 Created`
-  - **Body**:
-    ```json
-    {
-      "ID": 1,
-      "Time": "2024-01-01T12:00:00Z",
-      "LocationID": "uuid-string"
-    }
-    ```
-
----
-
-### GET /check
-
-Obtiene la lista de checks registrados.
-
-- **Método**: `GET`
-- **URL**: `/check`
-- **Query Parameters**:
-  | Parámetro | Tipo | Requerido | Descripción |
-  |-----------|------|----------|-------------|
-  | `limit` | int | No | Cantidad máxima de registros. Default: `40`. Rango: `1` a `100` |
-  | `from` | string | No | Fecha/hora de inicio para filtrar (formato SQLite) |
-  | `to` | string | No | Fecha/hora de fin para filtrar (formato SQLite) |
-  | `location_id` | string (UUID) | No | Filtrar por ubicación |
-- **Respuesta exitosa**:
-  - **Código**: `200 OK`
-  - **Body**:
-    ```json
-    [
-      {
-        "ID": 1,
-        "Time": "2024-01-01T12:00:00Z",
-        "LocationID": "uuid-string"
-      }
-    ]
-    ```
-
----
-
 ### GET /uptime
 
 Obtiene la lista de registros de uptime (tiempo que una ubicación estuvo conectada).
@@ -167,20 +110,21 @@ Endpoint WebSocket para rastrear el uptime de una ubicación. Al conectarse crea
 
 La aplicación utiliza **SQLite** como base de datos, gestionada a través de **GORM**.
 
+### Tabla: `users`
+
+| Campo | Tipo | Descripción |
+|-------|------|-------------|
+| `id` | TEXT (UUID) | Clave primaria |
+| `user_name` | TEXT | Nombre de usuario |
+| `pass_word` | TEXT | Contraseña del usuario |
+
 ### Tabla: `locations`
 
 | Campo | Tipo | Descripción |
 |-------|------|-------------|
 | `id` | TEXT (UUID) | Clave primaria |
 | `nombre` | TEXT | Nombre de la ubicación (único) |
-
-### Tabla: `checks`
-
-| Campo | Tipo | Descripción |
-|-------|------|-------------|
-| `id` | INTEGER | Clave primaria, autoincremental |
-| `time` | DATETIME | Fecha y hora del registro. Default: `current_timestamp` |
-| `location_id` | TEXT (UUID) | FK hacia locations |
+| `user_id` | TEXT (UUID) | FK hacia users |
 
 ### Tabla: `uptimes`
 

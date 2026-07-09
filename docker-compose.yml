@@ -7,3 +7,4 @@ services:
       - "${PORT}:${PORT}"
     environment:
       - PORT=${PORT}
+      - JWT_SECRET=${JWT_SECRET}

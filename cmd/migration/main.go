@@ -39,17 +39,17 @@ func main() {
 	}
 
 	err = db.Migrator().DropTable(
-		&internal.Location{},
-		&internal.Check{},
 		&internal.Uptime{},
+		&internal.Location{},
+		&internal.User{},
 	)
 	if err != nil {
 		panic(err)
 	}
 	err = db.AutoMigrate(
-		&internal.Check{},
 		&internal.Uptime{},
 		&internal.Location{},
+		&internal.User{},
 	)
 	if err != nil {
 		panic(err)

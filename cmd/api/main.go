@@ -5,14 +5,17 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 	"xelemetry/internal"
 
 	"github.com/go-playground/validator/v10"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/labstack/echo/v5"
 	"github.com/labstack/echo/v5/middleware"
+	"github.com/matthewhartstonge/argon2"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"gorm.io/driver/sqlite"
@@ -34,6 +37,28 @@ func (cv *CustomValidator) Validate(i any) error {
 	return nil
 }
 
+func userIDFromToken(c *echo.Context) (string, error) {
+	auth := c.Request().Header.Get("Authorization")
+	if !strings.HasPrefix(auth, "Bearer ") {
+		return "", echo.ErrUnauthorized
+	}
+	token, err := jwt.Parse(strings.TrimPrefix(auth, "Bearer "), func(t *jwt.Token) (any, error) {
+		return []byte(os.Getenv("JWT_SECRET")), nil
+	})
+	if err != nil || !token.Valid {
+		return "", echo.ErrUnauthorized
+	}
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return "", echo.ErrUnauthorized
+	}
+	sub, _ := claims["sub"].(string)
+	if sub == "" {
+		return "", echo.ErrUnauthorized
+	}
+	return sub, nil
+}
+
 type GetCheckQuery struct {
 	Limit      *int    `query:"limit" validate:"omitempty,gte=1,lte=100"`
 	From       *string `query:"from"`
@@ -45,7 +70,7 @@ type GetUptimeQuery struct {
 	Limit      *int    `query:"limit" validate:"omitempty,gte=1,lte=100"`
 	From       *string `query:"from"`
 	To         *string `query:"to"`
-	LocationID *string `query:"location_id" validate:"omitempty,uuid"`
+	LocationID string  `query:"location_id" validate:"required,uuid"`
 }
 
 func main() {
@@ -56,6 +81,9 @@ func main() {
 	}
 	if os.Getenv("PORT") == "" {
 		panic("PORT environment variable is not set")
+	}
+	if os.Getenv("JWT_SECRET") == "" {
+		panic("JWT_SECRET environment variable is not set")
 	}
 	e := echo.New()
 	e.Logger = slog.New(zerolog.NewSlogHandler(log.Output(zerolog.ConsoleWriter{Out: os.Stderr})))
@@ -71,29 +99,11 @@ func main() {
 
 	e.Use(middleware.Recover())
 
-	e.POST("/check", func(c *echo.Context) error {
-		var req struct {
-			LocationID string `json:"location_id" validate:"required,uuid"`
-		}
-		if err := c.Bind(&req); err != nil {
-			e.Logger.Error("failed to bind check", "error", err)
-			return err
-		}
-		if err := c.Validate(&req); err != nil {
-			e.Logger.Error("failed to validate check", "error", err)
-			return err
-		}
-
-		check := internal.Check{
-			LocationID: req.LocationID,
-		}
-		err := gorm.G[internal.Check](db).Create(c.Request().Context(), &check)
-		if err != nil {
-			e.Logger.Error("failed to create check", "error", err)
-			return err
-		}
-		return c.JSON(http.StatusCreated, check)
-	})
+	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
+		AllowOrigins: []string{"*"},
+		AllowMethods: []string{"*"},
+		AllowHeaders: []string{"*"},
+	}))
 
 	e.GET("/ws", func(c *echo.Context) error {
 		ws, err := upgrader.Upgrade(c.Response(), c.Request(), nil)
@@ -138,6 +148,11 @@ func main() {
 	})
 
 	e.POST("/location", func(c *echo.Context) error {
+		userID, err := userIDFromToken(c)
+		if err != nil {
+			return err
+		}
+
 		var req struct {
 			Nombre string `json:"nombre" validate:"required"`
 		}
@@ -152,6 +167,7 @@ func main() {
 		location := internal.Location{
 			ID:     uuid.New().String(),
 			Nombre: req.Nombre,
+			UserID: userID,
 		}
 		if err := gorm.G[internal.Location](db).Create(c.Request().Context(), &location); err != nil {
 			e.Logger.Error("failed to create location", "error", err)
@@ -161,7 +177,12 @@ func main() {
 	})
 
 	e.GET("/location", func(c *echo.Context) error {
-		locations, err := gorm.G[internal.Location](db).Find(c.Request().Context())
+		userID, err := userIDFromToken(c)
+		if err != nil {
+			return err
+		}
+
+		locations, err := gorm.G[internal.Location](db).Where("user_id = ?", userID).Find(c.Request().Context())
 		if err != nil {
 			e.Logger.Error("failed to get locations", "error", err)
 			return err
@@ -169,48 +190,12 @@ func main() {
 		return c.JSON(http.StatusOK, locations)
 	})
 
-	e.GET("/check", func(c *echo.Context) error {
-		var query GetCheckQuery
-		if err := c.Bind(&query); err != nil {
-			e.Logger.Error("failed to bind query", "error", err)
-			return err
-		}
-		if err := c.Validate(&query); err != nil {
-			e.Logger.Error("failed to validate query", "error", err)
-			err = c.JSON(http.StatusBadRequest, err.Error())
-			if err != nil {
-				e.Logger.Error("failed to serialize error", "error", err)
-			}
-			return err
-		}
-		limit := 40
-		if query.Limit != nil {
-			limit = *query.Limit
-		}
-		sql := gorm.G[internal.Check](db).Where("id > ?", 0)
-		if query.LocationID != nil {
-			sql = sql.Where("location_id = ?", *query.LocationID)
-		}
-		if query.From != nil {
-			sql = sql.Where("time >= ?", *query.From)
-		}
-		if query.To != nil {
-			sql = sql.Where("time <= ?", *query.To)
-		}
-		checks, err := sql.Limit(limit).Find(c.Request().Context())
-		if err != nil {
-			e.Logger.Error("failed to get checks", "error", err)
-			return nil
-		}
-		err = c.JSON(http.StatusOK, checks)
-		if err != nil {
-			e.Logger.Error("failed to serialize checks", "error", err)
-			return err
-		}
-		return nil
-	})
-
 	e.GET("/uptime", func(c *echo.Context) error {
+		userID, err := userIDFromToken(c)
+		if err != nil {
+			return err
+		}
+
 		var query GetUptimeQuery
 		if err := c.Bind(&query); err != nil {
 			e.Logger.Error("failed to bind query", "error", err)
@@ -224,14 +209,16 @@ func main() {
 			}
 			return err
 		}
+
+		if _, err := gorm.G[internal.Location](db).Where("id = ? AND user_id = ?", query.LocationID, userID).First(c.Request().Context()); err != nil {
+			return c.JSON(http.StatusNotFound, "location not found")
+		}
+
 		limit := 40
 		if query.Limit != nil {
 			limit = *query.Limit
 		}
-		sql := gorm.G[internal.Uptime](db).Where("id > ?", 0)
-		if query.LocationID != nil {
-			sql = sql.Where("location_id = ?", *query.LocationID)
-		}
+		sql := gorm.G[internal.Uptime](db).Where("location_id = ?", query.LocationID)
 		if query.From != nil {
 			sql = sql.Where("start_time >= ?", *query.From)
 		}
@@ -249,6 +236,79 @@ func main() {
 			return err
 		}
 		return nil
+	})
+
+	e.POST("/user", func(c *echo.Context) error {
+		var req struct {
+			UserName string `json:"user_name" validate:"required"`
+			PassWord string `json:"pass_word" validate:"required"`
+		}
+		if err := c.Bind(&req); err != nil {
+			e.Logger.Error("failed to bind user", "error", err)
+			return err
+		}
+		if err := c.Validate(&req); err != nil {
+			e.Logger.Error("failed to validate user", "error", err)
+			return err
+		}
+
+		cfg := argon2.DefaultConfig()
+		raw, err := cfg.Hash([]byte(req.PassWord), nil)
+		if err != nil {
+			e.Logger.Error("failed to hash password", "error", err)
+			return err
+		}
+
+		user := internal.User{
+			ID:       uuid.New().String(),
+			UserName: req.UserName,
+			PassWord: string(raw.Encode()),
+		}
+		if err := gorm.G[internal.User](db).Create(c.Request().Context(), &user); err != nil {
+			e.Logger.Error("failed to create user", "error", err)
+			return err
+		}
+		return c.JSON(http.StatusCreated, user)
+	})
+
+	e.POST("/login", func(c *echo.Context) error {
+		var req struct {
+			UserName string `json:"user_name" validate:"required"`
+			PassWord string `json:"pass_word" validate:"required"`
+		}
+		if err := c.Bind(&req); err != nil {
+			e.Logger.Error("failed to bind login", "error", err)
+			return err
+		}
+		if err := c.Validate(&req); err != nil {
+			e.Logger.Error("failed to validate login", "error", err)
+			return err
+		}
+
+		user, err := gorm.G[internal.User](db).Where("user_name = ?", req.UserName).First(c.Request().Context())
+		if err != nil {
+			return c.JSON(http.StatusUnauthorized, "invalid credentials")
+		}
+
+		ok, err := argon2.VerifyEncoded([]byte(req.PassWord), []byte(user.PassWord))
+		if err != nil || !ok {
+			return c.JSON(http.StatusUnauthorized, "invalid credentials")
+		}
+
+		claims := jwt.MapClaims{
+			"sub":  user.ID,
+			"name": user.UserName,
+			"iat":  time.Now().Unix(),
+			"exp":  time.Now().Add(72 * time.Hour).Unix(),
+		}
+		token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+		signed, err := token.SignedString([]byte(os.Getenv("JWT_SECRET")))
+		if err != nil {
+			e.Logger.Error("failed to sign token", "error", err)
+			return err
+		}
+
+		return c.JSON(http.StatusOK, map[string]string{"token": signed})
 	})
 
 	if err := e.Start(fmt.Sprintf(":%s", os.Getenv("PORT"))); err != nil {

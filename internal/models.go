@@ -4,12 +4,6 @@ import (
 	"time"
 )
 
-type Check struct {
-	ID         int
-	Time       *time.Time `gorm:"default:current_timestamp"`
-	LocationID string
-}
-
 type Uptime struct {
 	ID         int
 	Duration   *int
@@ -20,6 +14,13 @@ type Uptime struct {
 type Location struct {
 	ID      string
 	Nombre  string `gorm:"unique"`
-	Checks  []Check
 	Uptimes []Uptime
+	UserID  string
+}
+
+type User struct {
+	ID        string
+	UserName  string
+	PassWord  string
+	Locations []Location
 }
