@@ -13,14 +13,14 @@ import (
 )
 
 func main() {
-	if len(os.Args) < 2 {
-		log.Fatal("usage: daemon <location_id>")
-	}
-	locationID := os.Args[1]
+	locationID := os.Getenv("LOCATION_ID")
 
+	if locationID == "" {
+		log.Fatal("LOCATION_ID env var required")
+	}
 	apiURL := os.Getenv("API_URL")
 	if apiURL == "" {
-		apiURL = "http://localhost:1323"
+		log.Fatal("API_URL env var required")
 	}
 
 	u := url.URL{Scheme: "ws", Host: apiURL[7:], Path: "/ws", RawQuery: fmt.Sprintf("location_id=%s", locationID)}

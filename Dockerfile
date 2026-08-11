@@ -9,5 +9,4 @@ COPY . .
 
 RUN go build -o app cmd/api/main.go
 RUN go build -o migration cmd/migration/main.go
-
-CMD [ "./app" ]
+RUN go build -o daemon cmd/daemon/main.go
