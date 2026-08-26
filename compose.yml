@@ -1,0 +1,20 @@
+name: xelemetry
+
+services:
+  api:
+    image: ghcr.io/julioguirola/xelemetry:latest
+    restart: always
+    ports:
+      - "${PORT}:${PORT}"
+    environment:
+      - PORT=${PORT}
+      - JWT_SECRET=${JWT_SECRET}
+    command: ./app
+
+  daemon:
+    image: ghcr.io/julioguirola/xelemetry:latest
+    restart: always
+    environment:
+      - API_URL=${API_URL}
+      - LOCATION_ID=${LOCATION_ID}
+    command: ./app
