@@ -79,9 +79,6 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	if os.Getenv("PORT") == "" {
-		panic("PORT environment variable is not set")
-	}
 	if os.Getenv("JWT_SECRET") == "" {
 		panic("JWT_SECRET environment variable is not set")
 	}
