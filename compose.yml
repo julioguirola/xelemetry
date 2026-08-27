@@ -1,8 +1,34 @@
 name: xelemetry
 
+networks:
+  public_net:
+    external: true
+
 services:
   api:
     image: ghcr.io/julioguirola/xelemetry:latest
+    networks:
+      - public_net
+    deploy:
+      replicas: 1
+      update_config:
+        order: start-first
+        failure_action: rollback
+      labels:
+        - "traefik.enable=true"
+        - "traefik.docker.network=public_net"
+        - "traefik.http.routers.portfolio.rule=Host(`xel.tramitsdevs.tech`)"
+        - "traefik.http.routers.portfolio.entrypoints=websecure"
+        - "traefik.http.routers.portfolio.tls=true"
+        - "traefik.http.routers.portfolio.tls.certresolver=myresolver"
+        - "traefik.http.services.portfolio-svc.loadbalancer.server.port=80"
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 256M
+        reservations:
+          cpus: "0.05"
+          memory: 64M
     restart: always
     ports:
       - "${PORT}:${PORT}"
@@ -11,10 +37,10 @@ services:
       - JWT_SECRET=${JWT_SECRET}
     command: ./app
 
-  daemon:
-    image: ghcr.io/julioguirola/xelemetry:latest
-    restart: always
-    environment:
-      - API_URL=${API_URL}
-      - LOCATION_ID=${LOCATION_ID}
-    command: ./app
+  # daemon:
+  #   image: ghcr.io/julioguirola/xelemetry:latest
+  #   restart: always
+  #   environment:
+  #     - API_URL=${API_URL}
+  #     - LOCATION_ID=${LOCATION_ID}
+  #   command: ./app

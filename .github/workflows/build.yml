@@ -34,3 +34,6 @@ jobs:
           file: ./Dockerfile
           push: true
           tags: ghcr.io/${{ github.actor }}/xelemetry:latest
+      # - 
+      #   name: Deploy via Portainer webhook
+      #   run: curl -X POST "${{ secrets.PORTAINER_WEBHOOK_PORTFOLIO }}"
