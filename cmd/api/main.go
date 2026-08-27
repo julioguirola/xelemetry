@@ -105,6 +105,10 @@ func main() {
 		AllowHeaders: []string{"*"},
 	}))
 
+	e.GET("/", func(c *echo.Context) error {
+		return c.JSON(200, "ok")
+	})
+
 	e.GET("/ws", func(c *echo.Context) error {
 		ws, err := upgrader.Upgrade(c.Response(), c.Request(), nil)
 		if err != nil {
