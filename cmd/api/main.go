@@ -315,7 +315,7 @@ func main() {
 		return c.JSON(http.StatusOK, map[string]string{"token": signed})
 	})
 
-	if err := e.Start(fmt.Sprintf(":%s", os.Getenv("PORT"))); err != nil {
+	if err := e.Start(fmt.Sprintf(":%d", 1323)); err != nil {
 		e.Logger.Error("failed to start server", "error", err)
 	}
 }

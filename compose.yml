@@ -28,12 +28,6 @@ services:
           cpus: "0.05"
           memory: 64M
     restart: always
-    ports:
-      - "${PORT}:${PORT}"
-    environment:
-      - PORT=${PORT}
-      - JWT_SECRET=${JWT_SECRET}
-    command: ./app
 
   # daemon:
   #   image: ghcr.io/julioguirola/xelemetry:latest
