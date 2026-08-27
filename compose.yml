@@ -1,5 +1,3 @@
-name: xelemetry
-
 networks:
   public_net:
     external: true
