@@ -62,18 +62,19 @@ func sendTelegramNotification(text string) {
 		log.Error().Err(err).Msg("telegram notification failed to marshal message")
 		return
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
 
-	req, err := http.NewRequestWithContext(ctx, "POST", "https://api.telegram.org/bot"+botToken+"/sendMessage", strings.NewReader(string(body)))
-	if err != nil {
-		log.Error().Err(err).Msg("telegram notification failed to build request")
-		return
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	client := &http.Client{}
 	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		req, err := http.NewRequestWithContext(ctx, "POST", "https://api.telegram.org/bot"+botToken+"/sendMessage", strings.NewReader(string(body)))
+		if err != nil {
+			log.Error().Err(err).Msg("telegram notification failed to build request")
+			return
+		}
+		req.Header.Set("Content-Type", "application/json")
+
+		client := &http.Client{}
 		resp, err := client.Do(req)
 		if err != nil {
 			log.Error().Err(err).Msg("telegram notification request failed")
