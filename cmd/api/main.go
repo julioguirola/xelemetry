@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -29,6 +31,46 @@ type CustomValidator struct {
 var (
 	upgrader = websocket.Upgrader{}
 )
+
+type telegramMessage struct {
+	ChatID          string `json:"chat_id"`
+	MessageThreadID int    `json:"message_thread_id,omitempty"`
+	Text            string `json:"text"`
+}
+
+func sendTelegramNotification(text string) {
+	botToken := os.Getenv("TELEGRAM_BOT_TOKEN")
+	chatID := os.Getenv("TELEGRAM_CHAT_ID")
+	threadID := os.Getenv("TELEGRAM_MESSAGE_THREAD_ID")
+
+	if botToken == "" || chatID == "" {
+		return
+	}
+
+	msg := telegramMessage{
+		ChatID: chatID,
+		Text:   text,
+	}
+	if threadID != "" {
+		fmt.Sscanf(threadID, "%d", &msg.MessageThreadID)
+	}
+
+	body, _ := json.Marshal(msg)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	req, _ := http.NewRequestWithContext(ctx, "POST", "https://api.telegram.org/bot"+botToken+"/sendMessage", strings.NewReader(string(body)))
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	go func() {
+		resp, err := client.Do(req)
+		if err != nil {
+			return
+		}
+		resp.Body.Close()
+	}()
+}
 
 func (cv *CustomValidator) Validate(i any) error {
 	if err := cv.validator.Struct(i); err != nil {
@@ -126,12 +168,14 @@ func main() {
 		}
 
 		c.Logger().Info(fmt.Sprintf("Location %s conectada.", locationID))
+		sendTelegramNotification("Hay corriente y conexión ⚡")
 
 		defer func() {
 			duration := int(time.Since(startTime).Seconds())
 			if _, err := gorm.G[internal.Uptime](db).Where("id = ?", uptimeRecord.ID).Update(c.Request().Context(), "duration", duration); err != nil {
 				c.Logger().Error(fmt.Sprintf("failed to update uptime for %s: %v", locationID, err))
 			}
+			sendTelegramNotification("No hay corriente o conexión 🔌")
 			err = ws.Close()
 			if err != nil {
 				return
