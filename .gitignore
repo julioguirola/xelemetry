@@ -1,5 +1,2 @@
 .env
 checks.db
-api
-daemon
-migration

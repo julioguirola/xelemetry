@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
@@ -44,6 +45,7 @@ func sendTelegramNotification(text string) {
 	threadID := os.Getenv("TELEGRAM_MESSAGE_THREAD_ID")
 
 	if botToken == "" || chatID == "" {
+		log.Debug().Msg("telegram notification skipped: TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID not set")
 		return
 	}
 
@@ -55,20 +57,43 @@ func sendTelegramNotification(text string) {
 		fmt.Sscanf(threadID, "%d", &msg.MessageThreadID)
 	}
 
-	body, _ := json.Marshal(msg)
+	body, err := json.Marshal(msg)
+	if err != nil {
+		log.Error().Err(err).Msg("telegram notification failed to marshal message")
+		return
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	req, _ := http.NewRequestWithContext(ctx, "POST", "https://api.telegram.org/bot"+botToken+"/sendMessage", strings.NewReader(string(body)))
+	req, err := http.NewRequestWithContext(ctx, "POST", "https://api.telegram.org/bot"+botToken+"/sendMessage", strings.NewReader(string(body)))
+	if err != nil {
+		log.Error().Err(err).Msg("telegram notification failed to build request")
+		return
+	}
 	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{}
 	go func() {
 		resp, err := client.Do(req)
 		if err != nil {
+			log.Error().Err(err).Msg("telegram notification request failed")
 			return
 		}
-		resp.Body.Close()
+		defer resp.Body.Close()
+
+		respBody, err := io.ReadAll(resp.Body)
+		if err != nil {
+			log.Error().Err(err).Msg("telegram notification failed to read response")
+			return
+		}
+		if resp.StatusCode != http.StatusOK {
+			log.Error().
+				Str("status", resp.Status).
+				Str("body", string(respBody)).
+				Msg("telegram notification rejected")
+			return
+		}
+		log.Info().Str("text", text).Msg("telegram notification sent")
 	}()
 }
 
