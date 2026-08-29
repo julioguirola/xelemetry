@@ -30,6 +30,9 @@ services:
     restart: always
     environment:
       - JWT_SECRET=${JWT_SECRET}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+      - TELEGRAM_MESSAGE_THREAD_ID=${TELEGRAM_MESSAGE_THREAD_ID}
 
   # daemon:
   #   image: ghcr.io/julioguirola/xelemetry:latest
