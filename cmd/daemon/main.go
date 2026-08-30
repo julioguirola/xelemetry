@@ -46,6 +46,22 @@ func main() {
 
 		log.Printf("connected — location %s", locationID)
 
+		c.SetReadDeadline(time.Now().Add(60 * time.Second))
+		c.SetPongHandler(func(string) error {
+			c.SetReadDeadline(time.Now().Add(60 * time.Second))
+			return nil
+		})
+
+		go func() {
+			ticker := time.NewTicker(30 * time.Second)
+			defer ticker.Stop()
+			for range ticker.C {
+				if err := c.WriteMessage(websocket.PingMessage, nil); err != nil {
+					return
+				}
+			}
+		}()
+
 		done := make(chan struct{})
 		go func() {
 			defer close(done)

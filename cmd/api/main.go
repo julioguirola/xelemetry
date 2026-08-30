@@ -208,6 +208,22 @@ func main() {
 			}
 		}()
 
+		ws.SetReadDeadline(time.Now().Add(60 * time.Second))
+		ws.SetPongHandler(func(string) error {
+			ws.SetReadDeadline(time.Now().Add(60 * time.Second))
+			return nil
+		})
+
+		go func() {
+			ticker := time.NewTicker(30 * time.Second)
+			defer ticker.Stop()
+			for range ticker.C {
+				if err := ws.WriteMessage(websocket.PingMessage, nil); err != nil {
+					return
+				}
+			}
+		}()
+
 		for {
 			_, _, err := ws.ReadMessage()
 			if err != nil {
