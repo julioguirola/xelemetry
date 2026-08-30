@@ -25,6 +25,16 @@ import (
 	"gorm.io/gorm"
 )
 
+var cubaLocation *time.Location
+
+func init() {
+	var err error
+	cubaLocation, err = time.LoadLocation("America/Havana")
+	if err != nil {
+		panic(fmt.Sprintf("failed to load Cuba timezone: %v", err))
+	}
+}
+
 type CustomValidator struct {
 	validator *validator.Validate
 }
@@ -194,7 +204,8 @@ func main() {
 		}
 
 		c.Logger().Info(fmt.Sprintf("Location %s conectada.", locationID))
-		sendTelegramNotification("Hay corriente y conexión ⚡")
+		startTimeCuba := startTime.In(cubaLocation)
+		sendTelegramNotification(fmt.Sprintf("Hay corriente y conexión ⚡. La corriente llego a las %s", startTimeCuba.Format("15:04:05")))
 
 		defer func() {
 			duration := int(time.Since(startTime).Seconds())
