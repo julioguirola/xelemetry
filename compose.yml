@@ -2,6 +2,9 @@ networks:
   public_net:
     external: true
 
+volumes:
+  xel_db:
+
 services:
   api:
     image: ghcr.io/julioguirola/xelemetry:latest
@@ -28,6 +31,8 @@ services:
           cpus: "0.05"
           memory: 64M
     restart: always
+    volumes:
+      - xel_db:/app/checks.db
     environment:
       - JWT_SECRET=${JWT_SECRET}
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}

@@ -23,19 +23,21 @@ func main() {
 		log.Fatal("API_URL env var required")
 	}
 
-	u := url.URL{Scheme: "ws", Host: apiURL[7:], Path: "/ws", RawQuery: fmt.Sprintf("location_id=%s", locationID)}
-	if apiURL[:7] == "http://" {
-		u.Scheme = "ws"
-		u.Host = apiURL[7:]
-	} else {
-		u.Scheme = "wss"
-		u.Host = apiURL[8:]
-	}
+	daemonStart := time.Now()
 
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 
 	for {
+		u := url.URL{Scheme: "ws", Host: apiURL[7:], Path: "/ws", RawQuery: fmt.Sprintf("location_id=%s&uptime=%d", locationID, int(time.Since(daemonStart).Seconds()))}
+		if apiURL[:7] == "http://" {
+			u.Scheme = "ws"
+			u.Host = apiURL[7:]
+		} else {
+			u.Scheme = "wss"
+			u.Host = apiURL[8:]
+		}
+
 		log.Printf("connecting to %s", u.String())
 		c, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
 		if err != nil {

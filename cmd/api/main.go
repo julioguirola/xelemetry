@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 	"xelemetry/internal"
@@ -25,16 +26,6 @@ import (
 	"gorm.io/gorm"
 )
 
-var cubaLocation *time.Location
-
-func init() {
-	var err error
-	cubaLocation, err = time.LoadLocation("America/Havana")
-	if err != nil {
-		panic(fmt.Sprintf("failed to load Cuba timezone: %v", err))
-	}
-}
-
 type CustomValidator struct {
 	validator *validator.Validate
 }
@@ -47,6 +38,30 @@ type telegramMessage struct {
 	ChatID          string `json:"chat_id"`
 	MessageThreadID int    `json:"message_thread_id,omitempty"`
 	Text            string `json:"text"`
+}
+
+func formatUptime(secs int) string {
+	d := secs / 86400
+	secs %= 86400
+	h := secs / 3600
+	secs %= 3600
+	m := secs / 60
+	s := secs % 60
+
+	parts := []string{}
+	if d > 0 {
+		parts = append(parts, fmt.Sprintf("%dd", d))
+	}
+	if h > 0 {
+		parts = append(parts, fmt.Sprintf("%dh", h))
+	}
+	if m > 0 {
+		parts = append(parts, fmt.Sprintf("%dm", m))
+	}
+	if s > 0 || len(parts) == 0 {
+		parts = append(parts, fmt.Sprintf("%ds", s))
+	}
+	return strings.Join(parts, " ")
 }
 
 func sendTelegramNotification(text string) {
@@ -194,9 +209,21 @@ func main() {
 			return c.JSON(http.StatusBadRequest, "location_id is required")
 		}
 
-		startTime := time.Now()
+		uptimeSecs, hasUptime := 0, false
+		if uptime := c.QueryParam("uptime"); uptime != "" {
+			if n, err := strconv.Atoi(uptime); err == nil && n > 0 {
+				uptimeSecs, hasUptime = n, true
+			}
+		}
+
+		cubaLoc, err := time.LoadLocation("America/Havana")
+		if err != nil {
+			cubaLoc = time.UTC
+		}
+		startTime := time.Now().In(cubaLoc)
 		uptimeRecord := internal.Uptime{
 			LocationID: locationID,
+			StartTime:  startTime,
 		}
 		if err := gorm.G[internal.Uptime](db).Create(c.Request().Context(), &uptimeRecord); err != nil {
 			c.Logger().Error(fmt.Sprintf("failed to create uptime for %s: %v", locationID, err))
@@ -204,8 +231,11 @@ func main() {
 		}
 
 		c.Logger().Info(fmt.Sprintf("Location %s conectada.", locationID))
-		startTimeCuba := startTime.In(cubaLocation)
-		sendTelegramNotification(fmt.Sprintf("Hay corriente y conexión ⚡. La corriente llego a las %s", startTimeCuba.Format("15:04:05")))
+		msg := "Hay corriente y conexión ⚡"
+		if hasUptime {
+			msg = fmt.Sprintf("Hay corriente y conexión ⚡. Hay corriente hace %s", formatUptime(uptimeSecs))
+		}
+		sendTelegramNotification(msg)
 
 		defer func() {
 			duration := int(time.Since(startTime).Seconds())
