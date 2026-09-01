@@ -27,8 +27,13 @@ func main() {
 		},
 	)
 
+	dbPath := os.Getenv("DB_PATH")
+	if dbPath == "" {
+		dbPath = "checks.db"
+	}
+
 	// Globally mode
-	db, err := gorm.Open(sqlite.Open("checks.db"), &gorm.Config{
+	db, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{
 		Logger: newLogger,
 	})
 	if err != nil {

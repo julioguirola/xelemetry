@@ -168,7 +168,11 @@ type GetUptimeQuery struct {
 
 func main() {
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
-	db, err := gorm.Open(sqlite.Open("checks.db"), &gorm.Config{})
+	dbPath := os.Getenv("DB_PATH")
+	if dbPath == "" {
+		dbPath = "checks.db"
+	}
+	db, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{})
 	if err != nil {
 		panic(err)
 	}

@@ -1,15 +1,18 @@
 name: xelemetry
 
 services:
-  # api:
-  #   build: .
-  #   restart: always
-  #   ports:
-  #     - "${PORT}:${PORT}"
-  #   environment:
-  #     - PORT=${PORT}
-  #     - JWT_SECRET=${JWT_SECRET}
-  #   command: ./app
+  api:
+    build: .
+    restart: always
+    ports:
+      - "${PORT}:${PORT}"
+    environment:
+      - PORT=${PORT}
+      - JWT_SECRET=${JWT_SECRET}
+      - DB_PATH=/data/checks.db
+    volumes:
+      - xel_db:/data
+    command: ./app
 
   daemon:
     build: .
@@ -18,3 +21,6 @@ services:
       - API_URL=${API_URL}
       - LOCATION_ID=${LOCATION_ID}
     command: ./daemon
+
+volumes:
+  xel_db:
